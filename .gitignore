@@ -2,3 +2,4 @@
 pruebas.ipynb
 *.csv
 /Auxiliar/*
+.env
