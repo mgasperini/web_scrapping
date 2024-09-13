@@ -3,3 +3,4 @@ pruebas.ipynb
 *.csv
 /Auxiliar/*
 .env
+*.pyc
