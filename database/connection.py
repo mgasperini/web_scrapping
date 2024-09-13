@@ -1,16 +1,33 @@
 import sqlite3
 
-
 def crear_conexion(nombre_bd):
+    """
+    Crea una conexión a la base de datos SQLite con el nombre dado.
+
+    Parámetros:
+    - nombre_bd (str): Nombre del archivo de la base de datos.
+
+    Retorna:
+    - conexion (sqlite3.Connection) o None: Objeto de conexión si la conexión es exitosa, o None si ocurre un error.
+    """
     try:
-        conexion = sqlite3.connect(nombre_bd)
+        conexion = sqlite3.connect(nombre_bd)  # Establece la conexión con la base de datos
         return conexion
     except sqlite3.Error as e:
-        print(f"Error al conectar con la base de datos: {e}")
+        print(f"Error al conectar con la base de datos: {e}")  # Imprime el error si ocurre
         return None
 
-
 def crear_bbdd(cursor):
+    """
+    Crea las tablas necesarias en la base de datos si no existen.
+
+    Parámetros:
+    - cursor (sqlite3.Cursor): Objeto cursor para ejecutar comandos SQL.
+
+    Ejecuta:
+    - Comando SQL para crear la tabla 'inmuebles' si no existe.
+    - Comando SQL para crear la tabla 'modificaciones_valor_inmuebles' si no existe.
+    """
     # Crear la tabla inmuebles si no existe
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS inmuebles (
