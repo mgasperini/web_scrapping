@@ -2,3 +2,8 @@
 pruebas.ipynb
 *.csv
 /Auxiliar/*
+.env
+*.pyc
+/Lib/*
+/Scripts/*
+pyvenv.cfg
