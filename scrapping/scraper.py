@@ -2,6 +2,7 @@ from bs4 import BeautifulSoup as bs
 from scrapping.parser import parsear_ubicacion, clasificar_y_parsear_caracteristicas
 from scrapping.helpers import get_request
 from datetime import date
+import os
 
 def obtener_ids_inmuebles(url_listado):
     """
@@ -34,20 +35,7 @@ def obtener_ids_inmuebles(url_listado):
 
     return datos_id_precio
 
-def obtener_datos_inmueble(url_inmueble):
-    """
-    Obtiene los datos detallados de un inmueble a partir de su URL.
-
-    Parámetros:
-    - url_inmueble (str): URL del inmueble.
-
-    Retorna:
-    - dict o None: Un diccionario con los datos del inmueble si la solicitud es exitosa, o None si falla.
-    """
-    html = get_request(url_inmueble)
-    if not html:
-        return None
-
+def obtener_datos_inmueble_codigo_fuente(html, url_inmueble=None):
     soup = bs(html, 'lxml')
 
     # Obtiene el nombre del inmueble
@@ -78,14 +66,43 @@ def obtener_datos_inmueble(url_inmueble):
     lista_caracteristicas_basicas = [
         caract.text.strip().replace("\n", "") for caract in soup.find('div', {'class': 'details-property'}).find_all('li')
     ]
-    caracteristicas_principales = clasificar_y_parsear_caracteristicas(lista_caracteristicas_basicas)
+    caracteristicas_principales = clasificar_y_parsear_caracteristicas(lista_caracteristicas_basicas, nombre_inmueble)
 
-    return {
-        "id_inmueble": url_inmueble.split('/')[-2],  # Extrae el ID del inmueble de la URL
-        "Nombre": nombre_inmueble,
-        "Precio": precio,
-        "Precio_anterior": precio_anterior,
-        **dic_ubicacion,
-        **caracteristicas_principales,
-        "fecha_creacion": date.today()  # Fecha actual de creación del registro
-    }
+    if not url_inmueble:
+        id_inmueble = soup.find('link',{'rel':'canonical'}).get('href').replace('https://www.idealista.com/inmueble/','').replace('/','')
+        return {
+            "id_inmueble": id_inmueble, 
+            "Nombre": nombre_inmueble,
+            "Precio": precio,
+            "Precio_anterior": precio_anterior,
+            **dic_ubicacion,
+            **caracteristicas_principales,
+            "fecha_creacion": date.today()  # Fecha actual de creación del registro
+        }
+    else:
+        return {
+            "id_inmueble": url_inmueble.split('/')[-2],  # Extrae el ID del inmueble de la URL
+            "Nombre": nombre_inmueble,
+            "Precio": precio,
+            "Precio_anterior": precio_anterior,
+            **dic_ubicacion,
+            **caracteristicas_principales,
+            "fecha_creacion": date.today()  # Fecha actual de creación del registro
+        }
+
+def obtener_datos_inmueble(url_inmueble):
+    """
+    Obtiene los datos detallados de un inmueble a partir de su URL.
+
+    Parámetros:
+    - url_inmueble (str): URL del inmueble.
+
+    Retorna:
+    - dict o None: Un diccionario con los datos del inmueble si la solicitud es exitosa, o None si falla.
+    """
+    html = get_request(url_inmueble)
+    if not html:
+        return None
+
+    return obtener_datos_inmueble_codigo_fuente(html=html,url_inmueble=url_inmueble)
+    

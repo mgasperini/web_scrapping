@@ -89,7 +89,7 @@ def parsear_ubicacion(lista_datos):
         case _:
             return {'datos_ubicacion': lista_datos}
 
-def clasificar_y_parsear_caracteristicas(lista_caracteristicas):
+def clasificar_y_parsear_caracteristicas(lista_caracteristicas, nombre_inmueble):
     """
     Clasifica y parsea una lista de características de una propiedad en un diccionario con claves estandarizadas.
 
@@ -122,7 +122,7 @@ def clasificar_y_parsear_caracteristicas(lista_caracteristicas):
 
     # Expresiones regulares para cada tipo de característica
     regex_patterns = {
-        "tipo_propiedad": r"(casa|chalet|apartamento|piso|ático|independiente)",
+        "tipo_propiedad": r"(casa|chalet|apartamento|piso|ático|independiente|finca rústica|dúplex|estudio|torre})",
         "plantas": r"(\d+)\s*plantas?",
         "metros_construidos_m2": r"(\d+[\.\d+]*)\s*m²\s*construidos?",
         "habitaciones": r"(\d+)\s*habitaciones?",
@@ -160,7 +160,7 @@ def clasificar_y_parsear_caracteristicas(lista_caracteristicas):
                 elif key == "calefaccion":
                     # Extrae el tipo de calefacción
                     calefaccion = re.findall(r"(\w+)", match.group(0))[-1]
-                    if calefaccion:
+                    if (calefaccion) and (calefaccion != 'calefacción'):
                         caracteristicas[key] = calefaccion
                 elif key == "garaje":
                     # Indica si tiene plaza de garaje
@@ -190,5 +190,9 @@ def clasificar_y_parsear_caracteristicas(lista_caracteristicas):
                     # Para otros casos, solo almacenar el valor encontrado
                     caracteristicas[key] = match.group(0)
                 break
-
+        if not caracteristicas['tipo_propiedad']:
+            try:
+                caracteristicas['tipo_propiedad'] = re.search(regex_patterns['tipo_propiedad'],nombre_inmueble,re.IGNORECASE)[0]
+            except:
+                pass
     return caracteristicas

@@ -1,73 +1,115 @@
 import sys
 import os
 
-# Añade el directorio raíz del proyecto al sys.path para importar módulos correctamente
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 from tqdm import tqdm
 from database.connection import crear_conexion
 from database.operations import obtener_listado_bbdd, actualizar_valor_inmueble, insertar_inmueble
-from scrapping.scraper import obtener_ids_inmuebles, obtener_datos_inmueble
+from scrapping.scraper import obtener_ids_inmuebles, obtener_datos_inmueble, obtener_datos_inmueble_codigo_fuente
+
 from config import NOMBRE_BBDD, NUM_RETRIES
 
-# Carga las variables de entorno desde el archivo .env
 load_dotenv()
 
+def inicializar_scrapeops():
+    from config import inicializar_scrapeops
+    inicializar_scrapeops()
+
+def scrapear_paginas(conn, inmuebles_en_bbdd, offset, paginas_a_scrapear):
+    for pagina in tqdm(range(1 + offset, paginas_a_scrapear + 1 + offset)):
+        url = f"https://www.idealista.com/venta-viviendas/valencia-provincia/pagina-{pagina}.htm?ordenado-por=fecha-publicacion-desc"
+        dic_inmuebles = obtener_ids_inmuebles(url)
+        for id_inmueble, precio in tqdm(dic_inmuebles.items()):
+            if id_inmueble in inmuebles_en_bbdd:
+                if precio != inmuebles_en_bbdd[id_inmueble]:
+                    actualizar_valor_inmueble(conn, id_inmueble, inmuebles_en_bbdd[id_inmueble], precio)
+            else:
+                url_inmueble = f'https://www.idealista.com/inmueble/{id_inmueble}/'
+                for _ in range(NUM_RETRIES):
+                    datos_inmueble = obtener_datos_inmueble(url_inmueble)
+                    if datos_inmueble:
+                        insertar_inmueble(conn, datos_inmueble)
+                        break
+
+def scrapear_manualmente(conn):
+    archivo_path = "./Auxiliar/datos_pagina_web.txt"
+    
+    # Asegurarse de que el directorio existe
+    os.makedirs(os.path.dirname(archivo_path), exist_ok=True)
+    
+    # Borrar el contenido del archivo si existe, o crear uno nuevo
+    with open(archivo_path, 'w') as file:
+        pass  # Esto crea un archivo vacío o borra el contenido si ya existe
+    
+    print(f"Se ha creado/vaciado el archivo {archivo_path}")
+    print("Por favor, pegue el código fuente HTML de la página del inmueble en el archivo.")
+    input("Presione Enter cuando haya terminado...")
+    
+    # Leer el contenido del archivo
+    with open(archivo_path, 'r', encoding='utf-8') as file:
+        html = file.read()
+    
+    if not html.strip():
+        print("El archivo está vacío. No se puede procesar.")
+        return
+    
+    # id_inmueble = input("Ingrese el ID del inmueble:\n")
+    datos_inmueble = obtener_datos_inmueble_codigo_fuente(html)#, id_inmueble)
+    
+    if datos_inmueble:
+        insertar_inmueble(conn, datos_inmueble)
+
+def menu_principal():
+    while True:
+        print("\nMenú principal:")
+        print("1. Scrapear automáticamente (ScrapeOps)")
+        print("2. Scrapear Manualmente")
+        print("3. Salir")
+        opcion = input("Seleccionar una opción: ")
+        
+        if opcion == "1":
+            return "automatico"
+        elif opcion == "2":
+            return "manual"
+        elif opcion == "3":
+            return "salir"
+        else:
+            print("Opción no válida. Por favor, intentar de nuevo.")
 
 def main():
     try:
-        # Crea una conexión a la base de datos
         conn = crear_conexion(NOMBRE_BBDD)
-
-        # Obtiene el listado de inmuebles existentes en la base de datos
         inmuebles_en_bbdd = obtener_listado_bbdd(conn)
 
-        PAGINAS_A_SCRAPEAR = -1
-        OFFSET = -1
+        while True:
+            modo = menu_principal()
+            
+            if modo == "automatico":
+                if not scrapeops_inicializado:
+                    inicializar_scrapeops()
+                    scrapeops_inicializado = True
+                offset = -1
+                paginas_a_scrapear = -1
 
-        # Solicita al usuario el número de página de inicio y valida la entrada
-        while not str(OFFSET).isdigit():
-            OFFSET = int(input("Empezar desde la página:\n"))
-        OFFSET -= 1
+                while not str(offset).isdigit():
+                    offset = int(input("Empezar desde la página:\n"))
+                offset -= 1
 
-        # Solicita al usuario el número de páginas a scrapear y valida la entrada
-        while not str(
-                PAGINAS_A_SCRAPEAR).isdigit() and PAGINAS_A_SCRAPEAR != 0:
-            PAGINAS_A_SCRAPEAR = int(
-                input("Páginas a scrapear (ingresar un número positivo):\n"))
+                while not str(paginas_a_scrapear).isdigit() and paginas_a_scrapear != 0:
+                    paginas_a_scrapear = int(input("Páginas a scrapear (ingresar un número positivo):\n"))
 
-        # Itera sobre el rango de páginas a scrapear
-        for pagina in tqdm(range(1 + OFFSET, PAGINAS_A_SCRAPEAR + 1 + OFFSET)):
-            # Construye la URL de la página a scrapear
-            url = f"https://www.idealista.com/venta-viviendas/valencia-provincia/pagina-{pagina}.htm?ordenado-por=fecha-publicacion-desc"
-            # Obtiene los IDs y precios de los inmuebles en la página
-            dic_inmuebles = obtener_ids_inmuebles(url)
-            for id_inmueble, precio in tqdm(dic_inmuebles.items()):
-                # Verifica si el inmueble ya existe en la base de datos
-                if id_inmueble in inmuebles_en_bbdd:
-                    # Actualiza el valor del inmueble si ha cambiado
-                    if precio != inmuebles_en_bbdd[id_inmueble]:
-                        actualizar_valor_inmueble(
-                            conn, id_inmueble, inmuebles_en_bbdd[id_inmueble],
-                            precio)
-                else:
-                    # Obtiene la URL del inmueble y scrapea los datos
-                    url_inmueble = f'https://www.idealista.com/inmueble/{id_inmueble}/'
-                    for _ in range(NUM_RETRIES):
-                        datos_inmueble = obtener_datos_inmueble(url_inmueble)
-                        if datos_inmueble:
-                            # Inserta los datos del nuevo inmueble en la base de datos
-                            insertar_inmueble(conn, datos_inmueble)
-                            break
+                scrapear_paginas(conn, inmuebles_en_bbdd, offset, paginas_a_scrapear)
+            elif modo == "manual":
+                scrapear_manualmente(conn)
+            elif modo == "salir":
+                break
+
     except Exception as e:
-        # Maneja cualquier excepción y muestra un mensaje de error
         print(f"Error en el proceso de scraping: {e}")
     finally:
-        # Cierra la conexión a la base de datos
         conn.close()
 
-
-# Ejecuta la función main si el script se ejecuta directamente
 if __name__ == "__main__":
     main()
